@@ -1,0 +1,229 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  password      String
+  name          String
+  phone         String?
+  phoneVerified Boolean   @default(false)
+  avatar        String?
+  role          Role      @default(USER)
+  listings      Listing[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  favorites     Favorite[]
+  
+  // Messaging relations
+  conversationIds String[] @db.ObjectId
+  conversations   Conversation[] @relation(fields: [conversationIds], references: [id])
+  messages        Message[]
+  
+  // Q&A relations
+  questions       Question[]
+  answers         Answer[]
+  meetups         Meetup[]
+}
+
+model Category {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  name      String     @unique
+  slug      String     @unique
+  icon      String?
+  listings  Listing[]
+  questions Question[]
+}
+
+model Brand {
+  id       String    @id @default(auto()) @map("_id") @db.ObjectId
+  name     String    @unique
+  slug     String    @unique
+  logo     String?
+  listings Listing[]
+}
+
+model Listing {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  price       Float
+  condition   String   // new, like-new, good, fair
+  images      String[]
+  phone       String
+  location    String?
+
+  categoryId String   @db.ObjectId
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  brandId String @db.ObjectId
+  brand   Brand  @relation(fields: [brandId], references: [id])
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
+
+  isActive       Boolean        @default(true)
+  approvalStatus ApprovalStatus @default(PENDING)
+  viewCount      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  favorites      Favorite[]
+
+  // Promotion fields
+  isFeatured     Boolean   @default(false)
+  featuredUntil  DateTime?
+  isPriority     Boolean   @default(false)
+  priorityUntil  DateTime?
+  isUrgent       Boolean   @default(false)
+  urgentUntil    DateTime?
+  
+  // Phone visibility
+  showPhone      Boolean   @default(true)
+}
+
+model Favorite {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  listingId String   @db.ObjectId
+  listing   Listing  @relation(fields: [listingId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+}
+
+model Conversation {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  participants String[] @db.ObjectId // Array of User IDs
+  lastMessage String?
+  lastMessageAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  messages  Message[]
+  
+  users     User[]    @relation(fields: [participants], references: [id])
+}
+
+model Message {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  
+  senderId       String       @db.ObjectId
+  sender         User         @relation(fields: [senderId], references: [id])
+  
+  content        String
+  imageUrl       String?
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+}
+
+model Question {
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  title          String
+  description    String
+  images         String[]
+  
+  categoryId     String         @db.ObjectId
+  category       Category       @relation(fields: [categoryId], references: [id])
+  
+  userId         String         @db.ObjectId
+  user           User           @relation(fields: [userId], references: [id])
+  
+  approvalStatus ApprovalStatus @default(PENDING)
+  
+  // Promotion fields
+  isFeatured     Boolean        @default(false)
+  featuredUntil  DateTime?
+  isPriority     Boolean        @default(false)
+  priorityUntil  DateTime?
+  
+  viewCount      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  
+  answers        Answer[]
+}
+
+model Answer {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  content         String
+  
+  questionId      String   @db.ObjectId
+  question        Question @relation(fields: [questionId], references: [id])
+  
+  userId          String   @db.ObjectId
+  user            User     @relation(fields: [userId], references: [id])
+  
+  isAccepted      Boolean  @default(false)
+  isReadByOwner   Boolean  @default(false)
+  createdAt       DateTime @default(now())
+}
+
+model EmailVerification {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model PhoneVerification {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  phone     String   @unique
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+enum MeetupType {
+  CONCERT
+  LESSON
+  BAND
+  GEAR
+  STUDIO
+  COVERS
+}
+
+model Meetup {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  date        DateTime
+  location    String
+  type        MeetupType
+  images      String[]
+  videoUrl    String?
+  price       Float?
+  
+  approvalStatus ApprovalStatus @default(PENDING)
+
+  userId      String     @db.ObjectId
+  user        User       @relation(fields: [userId], references: [id])
+  
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}

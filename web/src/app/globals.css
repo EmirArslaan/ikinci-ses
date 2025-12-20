@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* Custom Scrollbar Hiding */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Theme Variables - Light Theme with Brown Accent */
+:root {
+  --primary: #8B4513;
+  --primary-light: #A0522D;
+  --primary-dark: #5D2E0C;
+  --background: #ffffff;
+  --background-alt: #f8f5f2;
+  --surface: #ffffff;
+  --surface-alt: #faf7f4;
+  --border: #e5ddd5;
+  --border-light: #f0ebe6;
+  --text: #1a1a1a;
+  --text-muted: #6b5c4d;
+  --text-light: #8c7b6b;
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
+  --color-primary-dark: var(--primary-dark);
+  --color-background: var(--background);
+  --color-background-alt: var(--background-alt);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-border: var(--border);
+  --color-border-light: var(--border-light);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-light: var(--text-light);
+}
+
+body {
+  background: var(--background);
+  color: var(--text);
+  font-family: 'Manrope', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: var(--primary);
+  color: white;
+}
