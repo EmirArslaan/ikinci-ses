@@ -59,7 +59,7 @@ function MessagesContent() {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const typingTimeoutRef = useRef<NodeJS.Timeout>();
+    const typingTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
     // Initial check and param handling
     useEffect(() => {

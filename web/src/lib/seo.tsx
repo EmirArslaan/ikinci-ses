@@ -68,7 +68,7 @@ export function generateMetadata({
                     alt: title,
                 },
             ],
-        },
+        } as any,
 
         // Twitter
         twitter: {

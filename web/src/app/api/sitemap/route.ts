@@ -28,7 +28,6 @@ export async function GET() {
         const categories = await prisma.category.findMany({
             select: {
                 slug: true,
-                updatedAt: true,
             },
         });
 
@@ -55,7 +54,7 @@ ${categories.map(category => `  <url>
     <loc>${baseUrl}/listings?category=${category.slug}</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
-    <lastmod>${category.updatedAt?.toISOString() || new Date().toISOString()}</lastmod>
+    <lastmod>${new Date().toISOString()}</lastmod>
   </url>`).join('\n')}
 ${listings.map(listing => `  <url>
     <loc>${baseUrl}/listings/${listing.id}</loc>

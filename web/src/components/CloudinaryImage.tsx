@@ -74,7 +74,7 @@ export function CloudinaryImage({
         delete imageProps.blurDataURL;
     }
 
-    return <Image {...imageProps} />;
+    return <Image {...(imageProps as any)} />;
 }
 
 /**
