@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserFromRequest } from "@/lib/auth";
+import { createConversationSchema } from "@/lib/validations/message.validation";
+import { createValidationErrorResponse, ValidationError } from "@/lib/validations/validation-helpers";
 
 // GET: List all conversations for the current user
 export async function GET(request: NextRequest) {
@@ -58,11 +60,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { receiverId } = await request.json();
+        const body = await request.json();
 
-        if (!receiverId) {
-            return NextResponse.json({ error: "Receiver ID required" }, { status: 400 });
+        // Map receiverId to participantId for validation
+        const validationBody = { participantId: body.receiverId };
+        const validation = createConversationSchema.safeParse(validationBody);
+        if (!validation.success) {
+            return createValidationErrorResponse(new ValidationError(validation.error.issues));
         }
+
+        const { participantId: receiverId } = validation.data;
 
         if (receiverId === payload.userId) {
             return NextResponse.json({ error: "Cannot message yourself" }, { status: 400 });
@@ -102,6 +109,12 @@ export async function POST(request: NextRequest) {
 
     } catch (error) {
         console.error("Create conversation error:", error);
+
+        // Handle validation errors
+        if (error instanceof ValidationError) {
+            return createValidationErrorResponse(error);
+        }
+
         return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 }

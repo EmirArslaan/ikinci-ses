@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserFromRequest } from "@/lib/auth";
+import { createListingSchema } from "@/lib/validations/listing.validation";
+import { createValidationErrorResponse, ValidationError } from "@/lib/validations/validation-helpers";
 
 // GET all listings with filters
 export async function GET(request: NextRequest) {
@@ -69,8 +71,17 @@ export async function GET(request: NextRequest) {
             // where.approvalStatus = "APPROVED"; 
         }
 
-        if (categoryId) where.categoryId = categoryId;
-        if (brandId) where.brandId = brandId;
+        // Multi-select support for categories and brands
+        if (categoryId) {
+            const categoryIds = categoryId.includes(',') ? categoryId.split(',') : [categoryId];
+            where.categoryId = { in: categoryIds };
+        }
+
+        if (brandId) {
+            const brandIds = brandId.includes(',') ? brandId.split(',') : [brandId];
+            where.brandId = { in: brandIds };
+        }
+
         if (condition) where.condition = condition;
         // userId handled above
         if (featured === "true") {
@@ -78,10 +89,15 @@ export async function GET(request: NextRequest) {
             where.featuredUntil = { gte: new Date() };
         }
 
-        if (minPrice || maxPrice) {
+        // Only apply price filter if at least one value is provided and > 0
+        // This treats minPrice=0 & maxPrice=0 as "no filter"
+        const hasMinPrice = minPrice && parseFloat(minPrice) > 0;
+        const hasMaxPrice = maxPrice && parseFloat(maxPrice) > 0;
+
+        if (hasMinPrice || hasMaxPrice) {
             where.price = {};
-            if (minPrice) where.price.gte = parseFloat(minPrice);
-            if (maxPrice) where.price.lte = parseFloat(maxPrice);
+            if (hasMinPrice) where.price.gte = parseFloat(minPrice);
+            if (hasMaxPrice) where.price.lte = parseFloat(maxPrice);
         }
 
         if (search) {
@@ -191,6 +207,13 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
+
+        // Validate with Zod
+        const validation = createListingSchema.safeParse(body);
+        if (!validation.success) {
+            return createValidationErrorResponse(new ValidationError(validation.error.issues));
+        }
+
         const {
             title,
             description,
@@ -202,7 +225,10 @@ export async function POST(request: NextRequest) {
             location,
             categoryId,
             brandId,
-            // Promotion fields
+        } = validation.data;
+
+        // Handle promotion fields separately (not in schema)
+        const {
             isFeatured,
             featuredUntil,
             isPriority,
@@ -211,19 +237,11 @@ export async function POST(request: NextRequest) {
             urgentUntil,
         } = body;
 
-        // Validate required fields
-        if (!title || !description || !price || !condition || !categoryId || !brandId || !phone) {
-            return NextResponse.json(
-                { error: "Tüm zorunlu alanları doldurun" },
-                { status: 400 }
-            );
-        }
-
         const listing = await prisma.listing.create({
             data: {
                 title,
                 description,
-                price: parseFloat(price),
+                price,
                 condition,
                 images: images || [],
                 phone,
@@ -271,6 +289,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(listing, { status: 201 });
     } catch (error) {
         console.error("Create listing error:", error);
+
+        // Handle validation errors
+        if (error instanceof ValidationError) {
+            return createValidationErrorResponse(error);
+        }
+
         return NextResponse.json(
             { error: "İlan oluşturulurken bir hata oluştu" },
             { status: 500 }

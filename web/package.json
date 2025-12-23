@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:socket": "tsx socket-server.ts",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:socket\" --names \"next,socket\" --prefix-colors \"cyan,magenta\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -13,17 +15,30 @@
     "seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@prisma/client": "^6.19.0",
+    "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
+    "chart.js": "^4.5.1",
     "cloudinary": "^2.8.0",
     "dotenv": "^17.2.3",
+    "express-rate-limit": "^8.2.1",
+    "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.562.0",
     "next": "16.0.10",
     "next-cloudinary": "^6.17.5",
     "nodemailer": "^7.0.11",
     "prisma": "^6.19.0",
+    "rate-limit-redis": "^4.3.1",
     "react": "19.2.1",
-    "react-dom": "19.2.1"
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "19.2.1",
+    "react-hook-form": "^7.69.0",
+    "react-hot-toast": "^2.6.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -34,6 +49,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
     "tailwindcss": "^4",

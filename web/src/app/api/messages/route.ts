@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserFromRequest } from "@/lib/auth";
+import { sendMessageSchema } from "@/lib/validations/message.validation";
+import { createValidationErrorResponse, ValidationError } from "@/lib/validations/validation-helpers";
 
 export async function POST(request: NextRequest) {
     try {
@@ -10,11 +12,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { conversationId, content, imageUrl } = await request.json();
+        const body = await request.json();
 
-        if (!conversationId || (!content && !imageUrl)) {
-            return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+        // Validate with Zod
+        const validation = sendMessageSchema.safeParse(body);
+        if (!validation.success) {
+            return createValidationErrorResponse(new ValidationError(validation.error.issues));
         }
+
+        const { conversationId, content, imageUrl } = validation.data;
 
         // Verify participation
         const conversation = await prisma.conversation.findUnique({
@@ -60,10 +66,34 @@ export async function POST(request: NextRequest) {
             return msg;
         });
 
+        // Create notification for recipient (the other participant)
+        const recipientId = conversation.participants.find(p => p !== payload.userId);
+        if (recipientId) {
+            const { createNotification } = await import("@/lib/notifications");
+            const sender = await prisma.user.findUnique({
+                where: { id: payload.userId },
+                select: { name: true }
+            });
+
+            await createNotification({
+                userId: recipientId,
+                type: "MESSAGE",
+                title: "Yeni Mesaj",
+                message: `${sender?.name || 'Bir kullanıcı'} size mesaj gönderdi`,
+                link: `/messages`
+            });
+        }
+
         return NextResponse.json(message);
 
     } catch (error) {
         console.error("Send message error:", error);
+
+        // Handle validation errors
+        if (error instanceof ValidationError) {
+            return createValidationErrorResponse(error);
+        }
+
         return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 }

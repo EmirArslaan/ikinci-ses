@@ -1,92 +1,138 @@
-import nodemailer from "nodemailer";
+import nodemailer from 'nodemailer';
+import { getVerificationEmailTemplate, getWelcomeEmailTemplate, getNotificationEmailTemplate } from './email-templates';
 
-// Email transporter - using Ethereal for demo/testing
-// In production, replace with your SMTP settings
+/**
+ * Email Service - Nodemailer with Gmail SMTP
+ * Completely FREE - No external service fees
+ * Limit: 500 emails/day with Gmail
+ */
+
+// Create reusable transporter
 let transporter: nodemailer.Transporter | null = null;
 
-async function getTransporter() {
+function getTransporter() {
     if (transporter) return transporter;
 
-    // Check if production SMTP is configured
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-        transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: parseInt(process.env.SMTP_PORT || "587"),
-            secure: process.env.SMTP_SECURE === "true",
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS,
-            },
-        });
-    } else {
-        // Demo mode: Create test account
-        const testAccount = await nodemailer.createTestAccount();
-        transporter = nodemailer.createTransport({
-            host: "smtp.ethereal.email",
-            port: 587,
-            secure: false,
-            auth: {
-                user: testAccount.user,
-                pass: testAccount.pass,
-            },
-        });
-        console.log("📧 Demo email mode - using Ethereal");
+    // Check if Gmail credentials are configured
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+        console.warn('⚠️  Gmail SMTP not configured. Running in DEMO mode.');
+        console.warn('   To enable real emails:');
+        console.warn('   1. Create a Gmail account');
+        console.warn('   2. Enable 2-Step Verification');
+        console.warn('   3. Generate App Password: https://myaccount.google.com/apppasswords');
+        console.warn('   4. Add to .env: GMAIL_USER=your@gmail.com');
+        console.warn('   5. Add to .env: GMAIL_APP_PASSWORD=your-app-password\n');
+        return null;
     }
+
+    transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // SSL
+        auth: {
+            user: process.env.GMAIL_USER,
+            pass: process.env.GMAIL_APP_PASSWORD,
+        },
+    });
 
     return transporter;
 }
 
-export async function sendVerificationEmail(email: string, code: string): Promise<{ success: boolean; previewUrl?: string }> {
-    try {
-        const transport = await getTransporter();
+export async function sendVerificationEmail(
+    email: string,
+    code: string
+): Promise<{ success: boolean; previewUrl?: string }> {
+    const transport = getTransporter();
 
-        const info = await transport.sendMail({
-            from: process.env.SMTP_FROM || '"İkinci Ses" <noreply@ikincises.com>',
+    // Demo mode
+    if (!transport) {
+        console.log(`📧 Demo verification email to ${email}:`);
+        console.log(`   ✉️  Subject: İkinci Ses - E-posta Doğrulama Kodu`);
+        console.log(`   🔑 Code: ${code}`);
+        console.log(`   ✅ Email sent (demo mode)\n`);
+        return { success: true };
+    }
+
+    try {
+        await transport.sendMail({
+            from: {
+                name: process.env.EMAIL_FROM_NAME || 'İkinci Ses',
+                address: process.env.GMAIL_USER!,
+            },
             to: email,
-            subject: "İkinci Ses - E-posta Doğrulama Kodu",
-            text: `İkinci Ses platformuna kayıt olmanız için ${code} numaralı kodu giriş yapmanız gerekmektedir. Bu Kodu Kimseyle paylaşmayınız!`,
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <div style="text-align: center; margin-bottom: 30px;">
-                        <h1 style="color: #8B4513; margin: 0;">İkinci Ses</h1>
-                        <p style="color: #666; margin-top: 5px;">Müziğe Yeniden Hayat Ver</p>
-                    </div>
-                    
-                    <div style="background: #f5f5f5; border-radius: 10px; padding: 30px; text-align: center;">
-                        <h2 style="color: #333; margin-top: 0;">E-posta Doğrulama Kodu</h2>
-                        <p style="color: #666; font-size: 16px;">
-                            İkinci Ses platformuna kayıt olmanız için aşağıdaki kodu giriş yapmanız gerekmektedir.
-                        </p>
-                        <div style="background: #8B4513; color: white; font-size: 32px; font-weight: bold; letter-spacing: 8px; padding: 20px 40px; border-radius: 8px; display: inline-block; margin: 20px 0;">
-                            ${code}
-                        </div>
-                        <p style="color: #999; font-size: 14px;">
-                            Bu kod <strong>1 dakika</strong> içinde geçerliliğini yitirecektir.
-                        </p>
-                    </div>
-                    
-                    <div style="margin-top: 30px; padding: 20px; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
-                        <p style="color: #856404; margin: 0; font-size: 14px;">
-                            ⚠️ <strong>Bu Kodu Kimseyle Paylaşmayınız!</strong>
-                        </p>
-                    </div>
-                    
-                    <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">
-                        Bu e-postayı siz talep etmediyseniz, lütfen dikkate almayın.
-                    </p>
-                </div>
-            `,
+            subject: 'İkinci Ses - E-posta Doğrulama Kodu',
+            html: getVerificationEmailTemplate(code),
+            text: `İkinci Ses platformuna kayıt olmanız için doğrulama kodunuz: ${code}\n\nBu kod 15 dakika içinde geçerliliğini yitirecektir.\n\nBu kodu kimseyle paylaşmayınız!`,
         });
 
-        // Get preview URL for Ethereal (demo mode)
-        const previewUrl = nodemailer.getTestMessageUrl(info);
-        if (previewUrl) {
-            console.log("📧 Preview URL:", previewUrl);
-        }
+        console.log(`✅ Verification email sent to ${email}`);
+        return { success: true };
+    } catch (error: any) {
+        console.error('❌ Email send error:', error.message);
+        return { success: false };
+    }
+}
 
-        return { success: true, previewUrl: previewUrl || undefined };
-    } catch (error) {
-        console.error("Email send error:", error);
+export async function sendWelcomeEmail(
+    email: string,
+    name: string
+): Promise<{ success: boolean }> {
+    const transport = getTransporter();
+
+    if (!transport) {
+        console.log(`📧 Demo welcome email to ${email} (${name})\n`);
+        return { success: true };
+    }
+
+    try {
+        await transport.sendMail({
+            from: {
+                name: process.env.EMAIL_FROM_NAME || 'İkinci Ses',
+                address: process.env.GMAIL_USER!,
+            },
+            to: email,
+            subject: 'Hoş Geldiniz - İkinci Ses',
+            html: getWelcomeEmailTemplate(name),
+            text: `Merhaba ${name},\n\nİkinci Ses ailesine katıldığınız için teşekkür ederiz!\n\nPlatformumuzda müzik ekipmanlarınızı alıp satabilir, sorularınızı sorabilir ve müzisyenlerle buluşabilirsiniz.`,
+        });
+
+        console.log(`✅ Welcome email sent to ${email}`);
+        return { success: true };
+    } catch (error: any) {
+        console.error('❌ Welcome email error:', error.message);
+        return { success: false };
+    }
+}
+
+export async function sendNotificationEmail(
+    email: string,
+    title: string,
+    message: string,
+    link?: string
+): Promise<{ success: boolean }> {
+    const transport = getTransporter();
+
+    if (!transport) {
+        console.log(`📧 Demo notification email to ${email}: ${title}\n`);
+        return { success: true };
+    }
+
+    try {
+        await transport.sendMail({
+            from: {
+                name: process.env.EMAIL_FROM_NAME || 'İkinci Ses',
+                address: process.env.GMAIL_USER!,
+            },
+            to: email,
+            subject: title,
+            html: getNotificationEmailTemplate(title, message, link),
+            text: `${title}\n\n${message}${link ? `\n\nLink: ${link}` : ''}`,
+        });
+
+        console.log(`✅ Notification email sent to ${email}`);
+        return { success: true };
+    } catch (error: any) {
+        console.error('❌ Notification email error:', error.message);
         return { success: false };
     }
 }

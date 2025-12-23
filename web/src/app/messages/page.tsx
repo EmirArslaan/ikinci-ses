@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useSocket } from "@/context/SocketContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import DetailHeader from "@/components/DetailHeader";
 
@@ -27,10 +28,22 @@ interface Message {
     sender: User;
     createdAt: string;
     isRead: boolean;
+    isPending?: boolean;
 }
 
 function MessagesContent() {
     const { token, user, isAuthenticated, isLoading } = useAuth();
+    const {
+        socket,
+        isConnected,
+        onlineUsers,
+        sendMessage: socketSendMessage,
+        joinConversation,
+        leaveConversation,
+        startTyping: socketStartTyping,
+        stopTyping: socketStopTyping,
+        markAsRead
+    } = useSocket();
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -40,11 +53,13 @@ function MessagesContent() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [loadingConversations, setLoadingConversations] = useState(true);
-    const [, setLoadingMessages] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
+    const [typers, setTypers] = useState<Set<string>>(new Set());
+    const [isTyping, setIsTyping] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
     // Initial check and param handling
     useEffect(() => {
@@ -61,7 +76,7 @@ function MessagesContent() {
         }
     }, [searchParams]);
 
-    // Fetch Conversations
+    // Fetch Conversations (initial load only)
     const fetchConversations = useCallback(async () => {
         try {
             const res = await fetch("/api/conversations", {
@@ -78,7 +93,7 @@ function MessagesContent() {
         }
     }, [token]);
 
-    // Fetch Messages
+    // Fetch Messages (initial load only)
     const fetchMessages = useCallback(async (convId: string) => {
         try {
             const res = await fetch(`/api/conversations/${convId}`, {
@@ -90,71 +105,173 @@ function MessagesContent() {
             }
         } catch (err) {
             console.error("Error fetching messages", err);
-        } finally {
-            setLoadingMessages(false);
         }
     }, [token]);
 
-    // Initial Load & Polling for Conversation List
+    // Initial fetch conversations
     useEffect(() => {
         if (!token) return;
         fetchConversations();
-
-        const interval = setInterval(fetchConversations, 10000); // Poll list every 10s
-        return () => clearInterval(interval);
     }, [token, fetchConversations]);
 
-    // Effect for Active Conversation (Load & Poll Messages)
+    // Handle active conversation (join room + fetch initial messages)
     useEffect(() => {
-        if (!token || !activeConversationId) return;
+        if (!activeConversationId || !isConnected) return;
 
-        setLoadingMessages(true);
+        // Join conversation room
+        joinConversation(activeConversationId);
+
+        // Fetch initial messages
         fetchMessages(activeConversationId);
 
-        const interval = setInterval(() => {
-            fetchMessages(activeConversationId);
-        }, 3000); // Poll messages every 3s
+        // Mark as read
+        markAsRead(activeConversationId);
 
-        return () => clearInterval(interval);
-    }, [token, activeConversationId, fetchMessages]);
+        return () => {
+            // Leave conversation on unmount
+            leaveConversation(activeConversationId);
+        };
+    }, [activeConversationId, isConnected, joinConversation, leaveConversation, fetchMessages, markAsRead]);
+
+    // Socket listeners
+    useEffect(() => {
+        if (!socket || !activeConversationId) return;
+
+        // New message handler
+        const handleNewMessage = (data: { message: Message; tempId?: string }) => {
+            setMessages(prev => {
+                // Remove temp message ifexists
+                const filtered = data.tempId
+                    ? prev.filter(m => m.id !== data.tempId)
+                    : prev;
+
+                // Check if message already exists
+                if (filtered.some(m => m.id === data.message.id)) {
+                    return filtered;
+                }
+
+                return [...filtered, data.message];
+            });
+
+            // Update conversation list
+            fetchConversations();
+
+            // Mark as read if conversation is active
+            if (activeConversationId) {
+                markAsRead(activeConversationId);
+            }
+        };
+
+        // Typing indicator handlers
+        const handleUserTyping = (data: { userId: string; username?: string }) => {
+            setTypers(prev => new Set([...prev, data.userId]));
+        };
+
+        const handleUserStoppedTyping = (data: { userId: string }) => {
+            setTypers(prev => {
+                const updated = new Set(prev);
+                updated.delete(data.userId);
+                return updated;
+            });
+        };
+
+        // Read receipts handler
+        const handleMessagesRead = () => {
+            setMessages(prev => prev.map(m =>
+                m.sender.id === user?.id ? { ...m, isRead: true } : m
+            ));
+        };
+
+        // Register listeners
+        socket.on('new_message', handleNewMessage);
+        socket.on('user_typing', handleUserTyping);
+        socket.on('user_stopped_typing', handleUserStoppedTyping);
+        socket.on('messages_read', handleMessagesRead);
+
+        return () => {
+            socket.off('new_message', handleNewMessage);
+            socket.off('user_typing', handleUserTyping);
+            socket.off('user_stopped_typing', handleUserStoppedTyping);
+            socket.off('messages_read', handleMessagesRead);
+        };
+    }, [socket, activeConversationId, user, fetchConversations, markAsRead]);
 
     // Scroll to bottom on new messages
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    // Handle input change with typing indicator
+    const handleMessageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setNewMessage(e.target.value);
+
+        if (!activeConversationId) return;
+
+        // Emit typing start
+        if (!isTyping) {
+            socketStartTyping(activeConversationId);
+            setIsTyping(true);
+        }
+
+        // Reset timeout
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => {
+            socketStopTyping(activeConversationId);
+            setIsTyping(false);
+        }, 3000);
+    };
+
     // Send Message
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !activeConversationId) return;
+        if (!newMessage.trim() || !activeConversationId || !user) return;
+
+        const content = newMessage;
+        const tempId = `temp-${Date.now()}`;
+
+        // Clear input immediately
+        setNewMessage("");
+
+        // Stop typing indicator
+        if (isTyping) {
+            socketStopTyping(activeConversationId);
+            setIsTyping(false);
+        }
+        clearTimeout(typingTimeoutRef.current);
+
+        // Optimistic update
+        const tempMessage: Message = {
+            id: tempId,
+            content,
+            sender: {
+                id: user.id,
+                name: user.name,
+                avatar: user.avatar
+            },
+            createdAt: new Date().toISOString(),
+            isRead: false,
+            isPending: true
+        };
+
+        setMessages(prev => [...prev, tempMessage]);
 
         try {
-            const res = await fetch("/api/messages", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    conversationId: activeConversationId,
-                    content: newMessage
-                })
+            await socketSendMessage({
+                conversationId: activeConversationId,
+                content
             });
-
-            if (res.ok) {
-                setNewMessage("");
-                fetchMessages(activeConversationId); // Refresh immediately
-                fetchConversations(); // Update side list preview
-            }
         } catch (err) {
             console.error("Send error", err);
+            // Remove temp message on error
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+            alert("Mesaj gönderilemedi. Lütfen tekrar deneyin.");
         }
     };
 
-    // Handle Image Select and Upload
+    // Handle Image Upload
     const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !activeConversationId) return;
+        if (!file || !activeConversationId || !user) return;
 
         // Reset input
         if (fileInputRef.current) {
@@ -164,7 +281,7 @@ function MessagesContent() {
         setUploadingImage(true);
 
         try {
-            // Convert to base64 using Promise
+            // Convert to base64
             const base64 = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => resolve(reader.result as string);
@@ -173,7 +290,7 @@ function MessagesContent() {
             });
 
             // Upload to Cloudinary
-            const uploadRes = await fetch("/api/upload", {
+            const uploadRes = await fetch("api/upload", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -183,33 +300,17 @@ function MessagesContent() {
             });
 
             if (!uploadRes.ok) {
-                const errorData = await uploadRes.json().catch(() => ({}));
-                console.error("Upload error response:", errorData);
                 throw new Error("Upload failed");
             }
 
             const { url } = await uploadRes.json();
 
-            // Send message with image
-            const messageRes = await fetch("/api/messages", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    conversationId: activeConversationId,
-                    imageUrl: url
-                })
+            // Send via socket
+            await socketSendMessage({
+                conversationId: activeConversationId,
+                imageUrl: url
             });
 
-            if (messageRes.ok) {
-                fetchMessages(activeConversationId);
-                fetchConversations();
-            } else {
-                const errorData = await messageRes.json().catch(() => ({}));
-                console.error("Message error response:", errorData);
-            }
         } catch (err) {
             console.error("Image upload error", err);
             alert("Görsel yüklenirken bir hata oluştu. Lütfen tekrar deneyin.");
@@ -219,12 +320,23 @@ function MessagesContent() {
     };
 
     const activeConversation = conversations.find(c => c.id === activeConversationId);
+    const otherUserId = activeConversation?.otherUser.id;
+    const isOtherUserOnline = otherUserId ? onlineUsers.has(otherUserId) : false;
+    const isOtherUserTyping = otherUserId ? typers.has(otherUserId) : false;
 
     if (isLoading) return null;
 
     return (
         <div className="bg-[#f3f4f6] h-screen flex flex-col">
             <DetailHeader />
+
+            {/* Connection Status Badge */}
+            <div className="max-w-[1440px] w-full mx-auto px-4 pt-2">
+                <div className={`inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full ${isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    <span className={`size-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                    {isConnected ? 'Bağlı' : 'Bağlantı kuruluyor...'}
+                </div>
+            </div>
 
             <div className="flex-1 max-w-[1440px] w-full mx-auto p-4 md:p-6 lg:p-8 flex gap-6 overflow-hidden">
                 {/* Sidebar (Conversation List) */}
@@ -248,10 +360,15 @@ function MessagesContent() {
                                     onClick={() => setActiveConversationId(conv.id)}
                                     className={`w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 ${activeConversationId === conv.id ? 'bg-orange-50 border-orange-100' : ''}`}
                                 >
-                                    <div
-                                        className="size-12 rounded-full bg-gray-200 bg-cover bg-center shrink-0"
-                                        style={{ backgroundImage: conv.otherUser.avatar ? `url('${conv.otherUser.avatar}')` : `url('https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUser.name)}&background=random')` }}
-                                    />
+                                    <div className="relative">
+                                        <div
+                                            className="size-12 rounded-full bg-gray-200 bg-cover bg-center shrink-0"
+                                            style={{ backgroundImage: conv.otherUser.avatar ? `url('${conv.otherUser.avatar}')` : `url('https://ui-avatars.com/api/?name=${encodeURIComponent(conv.otherUser.name)}&background=random')` }}
+                                        />
+                                        {onlineUsers.has(conv.otherUser.id) && (
+                                            <div className="absolute bottom-0 right-0 size-3 bg-green-500 rounded-full border-2 border-white" />
+                                        )}
+                                    </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-baseline mb-1">
                                             <h4 className="font-bold text-gray-900 truncate">{conv.otherUser.name}</h4>
@@ -281,13 +398,33 @@ function MessagesContent() {
                                 </button>
                                 {activeConversation && (
                                     <>
-                                        <div
-                                            className="size-10 rounded-full bg-gray-200 bg-cover bg-center"
-                                            style={{ backgroundImage: activeConversation.otherUser.avatar ? `url('${activeConversation.otherUser.avatar}')` : `url('https://ui-avatars.com/api/?name=${encodeURIComponent(activeConversation.otherUser.name)}&background=random')` }}
-                                        />
+                                        <div className="relative">
+                                            <div
+                                                className="size-10 rounded-full bg-gray-200 bg-cover bg-center"
+                                                style={{ backgroundImage: activeConversation.otherUser.avatar ? `url('${activeConversation.otherUser.avatar}')` : `url('https://ui-avatars.com/api/?name=${encodeURIComponent(activeConversation.otherUser.name)}&background=random')` }}
+                                            />
+                                            {isOtherUserOnline && (
+                                                <div className="absolute bottom-0 right-0 size-2.5 bg-green-500 rounded-full border-2 border-white" />
+                                            )}
+                                        </div>
                                         <div>
                                             <h3 className="font-bold text-gray-900">{activeConversation.otherUser.name}</h3>
-                                            <p className="text-xs text-green-600 font-medium">Çevrimiçi</p>
+                                            <p className="text-xs font-medium">
+                                                {isOtherUserTyping ? (
+                                                    <span className="text-blue-600 flex items-center gap-1">
+                                                        Yazıyor
+                                                        <span className="flex gap-0.5">
+                                                            <span className="size-1 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                                                            <span className="size-1 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                                                            <span className="size-1 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                                                        </span>
+                                                    </span>
+                                                ) : isOtherUserOnline ? (
+                                                    <span className="text-green-600">Çevrimiçi</span>
+                                                ) : (
+                                                    <span className="text-gray-400">Çevrimdışı</span>
+                                                )}
+                                            </p>
                                         </div>
                                     </>
                                 )}
@@ -299,7 +436,7 @@ function MessagesContent() {
                                     const isMe = msg.sender.id === user?.id;
                                     return (
                                         <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-[75%] md:max-w-[60%] rounded-2xl ${msg.imageUrl ? 'p-2' : 'px-5 py-3'} ${isMe ? 'bg-[#8B4513] text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'}`}>
+                                            <div className={`max-w-[75%] md:max-w-[60%] rounded-2xl ${msg.imageUrl ? 'p-2' : 'px-5 py-3'} ${isMe ? 'bg-[#8B4513] text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'} ${msg.isPending ? 'opacity-70' : ''}`}>
                                                 {msg.imageUrl && (
                                                     <img
                                                         src={msg.imageUrl}
@@ -313,11 +450,13 @@ function MessagesContent() {
                                                 )}
                                                 <div className={`flex items-center justify-end gap-1 text-[10px] mt-1 ${msg.imageUrl ? 'px-2' : ''} ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
                                                     <span>{new Date(msg.createdAt).toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' })}</span>
-                                                    {/* Görüldü göstergesi - sadece kendi mesajlarımda */}
                                                     {isMe && (
                                                         <span className={`material-symbols-outlined text-[14px] ${msg.isRead ? 'text-blue-300' : 'text-white/50'}`}>
                                                             done_all
                                                         </span>
+                                                    )}
+                                                    {msg.isPending && (
+                                                        <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
                                                     )}
                                                 </div>
                                             </div>
@@ -329,7 +468,6 @@ function MessagesContent() {
 
                             {/* Input Area */}
                             <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-100 bg-white flex gap-3">
-                                {/* Hidden file input */}
                                 <input
                                     ref={fileInputRef}
                                     type="file"
@@ -340,7 +478,7 @@ function MessagesContent() {
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    disabled={uploadingImage}
+                                    disabled={uploadingImage || !isConnected}
                                     className="size-10 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100 disabled:opacity-50"
                                 >
                                     {uploadingImage ? (
@@ -352,13 +490,14 @@ function MessagesContent() {
                                 <input
                                     type="text"
                                     value={newMessage}
-                                    onChange={(e) => setNewMessage(e.target.value)}
+                                    onChange={handleMessageInputChange}
                                     placeholder="Bir mesaj yazın..."
-                                    className="flex-1 bg-gray-100 rounded-full px-5 focus:outline-none focus:ring-2 focus:ring-[#8B4513]/20 focus:bg-white border border-transparent focus:border-[#8B4513]/30 transition-all font-medium text-gray-900"
+                                    disabled={!isConnected}
+                                    className="flex-1 bg-gray-100 rounded-full px-5 focus:outline-none focus:ring-2 focus:ring-[#8B4513]/20 focus:bg-white border border-transparent focus:border-[#8B4513]/30 transition-all font-medium text-gray-900 disabled:opacity-50"
                                 />
                                 <button
                                     type="submit"
-                                    disabled={!newMessage.trim()}
+                                    disabled={!newMessage.trim() || !isConnected}
                                     className="size-10 flex items-center justify-center bg-[#8B4513] text-white rounded-full hover:bg-[#A0522D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                                 >
                                     <span className="material-symbols-outlined text-[20px]">send</span>

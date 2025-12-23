@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, generateToken } from "@/lib/auth";
+import { loginSchema } from "@/lib/validations/auth.validation";
+import { createValidationErrorResponse, ValidationError } from "@/lib/validations/validation-helpers";
 
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { email, password } = body;
 
-        // Validate required fields
-        if (!email || !password) {
-            return NextResponse.json(
-                { error: "Email ve şifre zorunludur" },
-                { status: 400 }
-            );
+        // Validate with Zod
+        const validation = loginSchema.safeParse(body);
+        if (!validation.success) {
+            return createValidationErrorResponse(new ValidationError(validation.error.issues));
         }
+
+        const { email, password } = validation.data;
 
         // Find user
         const user = await prisma.user.findUnique({
@@ -56,8 +57,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Generate token with role
-        const token = generateToken({ userId: user.id, email: user.email, role: userRole });
+        // Generate token with role and name
+        const token = generateToken({
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+            role: userRole
+        });
 
         return NextResponse.json({
             message: "Giriş başarılı",
@@ -73,6 +79,12 @@ export async function POST(request: NextRequest) {
         });
     } catch (error) {
         console.error("Login error:", error);
+
+        // Handle validation errors
+        if (error instanceof ValidationError) {
+            return createValidationErrorResponse(error);
+        }
+
         return NextResponse.json(
             { error: "Giriş sırasında bir hata oluştu" },
             { status: 500 }

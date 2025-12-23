@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
 import DetailHeader from "@/components/DetailHeader";
 import ListingActions from "@/components/ListingActions";
+import ShareButtons from "@/components/ShareButtons";
 import { Listing, ListingsResponse } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 
@@ -307,6 +308,24 @@ export default function ListingDetailPage() {
                             {isOwner && (
                                 <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex flex-col gap-3">
                                     <h4 className="text-gray-900 font-bold border-b border-gray-100 pb-2">İlan Yönetimi</h4>
+
+                                    {/* Promote Button - COMING SOON */}
+                                    <div className="relative group">
+                                        <button
+                                            disabled
+                                            title="Bu özellik çok yakında aktif olacak!"
+                                            className="w-full bg-gradient-to-r from-gray-300 to-gray-400 text-gray-600 font-bold py-3 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed relative"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">rocket_launch</span>
+                                            İlanı Öne Çıkar
+                                        </button>
+                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] rounded-xl flex items-center justify-center pointer-events-none">
+                                            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-black text-base px-6 py-2 rounded-full shadow-2xl transform rotate-[-5deg] border-2 border-white">
+                                                YAKINDA!
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="flex gap-3">
                                         <Link
                                             href={`/listings/${id}/edit`}
@@ -352,7 +371,11 @@ export default function ListingDetailPage() {
                                         </div>
                                     </div>
                                     <div>
-                                        <h4 className="text-gray-900 font-bold text-lg">{listing.user.name}</h4>
+                                        <Link href={`/profile/${listing.userId}`}>
+                                            <h4 className="text-gray-900 font-bold text-lg hover:text-[#8B4513] transition-colors cursor-pointer">
+                                                {listing.user.name}
+                                            </h4>
+                                        </Link>
                                         <div className="flex items-center gap-1 text-sm text-gray-500">
                                             <span className="material-symbols-outlined text-yellow-500 text-sm">star</span>
                                             <span className="text-gray-900 font-bold">4.8</span>
@@ -394,6 +417,13 @@ export default function ListingDetailPage() {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Share Buttons */}
+                            <ShareButtons
+                                listingId={listing.id}
+                                title={listing.title}
+                                price={listing.price}
+                            />
                         </div>
                     </div>
                 </div>

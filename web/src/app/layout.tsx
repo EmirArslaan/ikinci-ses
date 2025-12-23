@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { SocketProvider } from "@/context/SocketContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ToastProvider } from "@/components/ToastProvider";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -28,9 +31,14 @@ export default function RootLayout({
         />
       </head>
       <body className={`${manrope.variable} font-sans antialiased overflow-x-hidden`} suppressHydrationWarning>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <SocketProvider>
+              {children}
+              <ToastProvider />
+            </SocketProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

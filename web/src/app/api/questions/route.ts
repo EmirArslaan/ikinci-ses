@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserFromRequest } from "@/lib/auth";
+import { createQuestionSchema } from "@/lib/validations/question.validation";
+import { createValidationErrorResponse, ValidationError } from "@/lib/validations/validation-helpers";
 
 // GET all questions with filters
 export async function GET(request: NextRequest) {
@@ -107,25 +109,27 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
+
+        // Validate with Zod
+        const validation = createQuestionSchema.safeParse(body);
+        if (!validation.success) {
+            return createValidationErrorResponse(new ValidationError(validation.error.issues));
+        }
+
         const {
             title,
             description,
             images,
             categoryId,
-            // Promotion fields
+        } = validation.data;
+
+        // Handle promotion fields separately
+        const {
             isFeatured,
             featuredUntil,
             isPriority,
             priorityUntil,
         } = body;
-
-        // Validate required fields
-        if (!title || !description || !categoryId) {
-            return NextResponse.json(
-                { error: "Başlık, açıklama ve kategori zorunludur" },
-                { status: 400 }
-            );
-        }
 
         const question = await prisma.question.create({
             data: {
@@ -155,6 +159,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(question, { status: 201 });
     } catch (error) {
         console.error("Create question error:", error);
+
+        // Handle validation errors
+        if (error instanceof ValidationError) {
+            return createValidationErrorResponse(error);
+        }
+
         return NextResponse.json(
             { error: "Soru oluşturulurken bir hata oluştu" },
             { status: 500 }

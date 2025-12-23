@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, generateToken } from "@/lib/auth";
+import { registerSchema } from "@/lib/validations/auth.validation";
+import { validateBody, createValidationErrorResponse, ValidationError } from "@/lib/validations/validation-helpers";
 
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { email, password, name, phone, verificationCode } = body;
+        const rawBody = await request.json();
+        const { verificationCode } = rawBody;
 
-        // Validate required fields
-        if (!email || !password || !name) {
-            return NextResponse.json(
-                { error: "E-posta, şifre ve isim zorunludur" },
-                { status: 400 }
-            );
+        // Validate with Zod
+        const validation = registerSchema.safeParse(rawBody);
+        if (!validation.success) {
+            return createValidationErrorResponse(new ValidationError(validation.error.issues));
         }
+
+        const { email, password, name, phone } = validation.data;
 
         if (!verificationCode) {
             return NextResponse.json(
@@ -82,8 +84,19 @@ export async function POST(request: NextRequest) {
             where: { email }
         });
 
-        // Generate token with role
-        const token = generateToken({ userId: user.id, email: user.email, role: user.role });
+        // Send welcome email (non-blocking)
+        const { sendWelcomeEmail } = await import('@/lib/email');
+        sendWelcomeEmail(user.email, user.name).catch(err => {
+            console.error('Failed to send welcome email:', err);
+        });
+
+        // Generate token with role and name
+        const token = generateToken({
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role
+        });
 
         return NextResponse.json({
             message: "Kayıt başarılı",
@@ -98,6 +111,12 @@ export async function POST(request: NextRequest) {
         });
     } catch (error) {
         console.error("Register error:", error);
+
+        // Handle validation errors
+        if (error instanceof ValidationError) {
+            return createValidationErrorResponse(error);
+        }
+
         return NextResponse.json(
             { error: "Kayıt sırasında bir hata oluştu" },
             { status: 500 }

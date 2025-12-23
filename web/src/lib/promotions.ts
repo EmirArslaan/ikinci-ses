@@ -56,3 +56,40 @@ export function calculatePromotionEndDate(weeks: number): Date {
 export function formatPrice(price: number): string {
     return new Intl.NumberFormat('tr-TR').format(price) + ' TL';
 }
+
+/**
+ * Apply promotions to a listing after payment
+ */
+export async function applyPromotionsToListing(
+    listingId: string,
+    promotions: Array<{ type: string; weeks: number }>
+) {
+    const { prisma } = await import('./prisma');
+    const updateData: any = {};
+
+    for (const promo of promotions) {
+        const endDate = calculatePromotionEndDate(promo.weeks);
+
+        switch (promo.type.toUpperCase()) {
+            case 'FEATURED':
+                updateData.isFeatured = true;
+                updateData.featuredUntil = endDate;
+                break;
+            case 'PRIORITY':
+                updateData.isPriority = true;
+                updateData.priorityUntil = endDate;
+                break;
+            case 'URGENT':
+                updateData.isUrgent = true;
+                updateData.urgentUntil = endDate;
+                break;
+        }
+    }
+
+    await prisma.listing.update({
+        where: { id: listingId },
+        data: updateData
+    });
+
+    console.log(`✅ Promotions applied to listing ${listingId}`);
+}

@@ -58,6 +58,11 @@ export async function PUT(
             updatedListing = await prisma.listing.update({
                 where: { id },
                 data: { approvalStatus: status as any }, // cast to any to bypass TS check if type missing
+                include: {
+                    user: {
+                        select: { id: true }
+                    }
+                }
             });
         } catch (e) {
             // Fallback to raw update
@@ -71,7 +76,37 @@ export async function PUT(
                 ]
             });
             // Fetch updated doc to return
-            updatedListing = await prisma.listing.findUnique({ where: { id } });
+            updatedListing = await prisma.listing.findUnique({
+                where: { id },
+                include: {
+                    user: {
+                        select: { id: true }
+                    }
+                }
+            });
+        }
+
+        // Create notification for listing owner
+        if (updatedListing && updatedListing.user) {
+            const { createNotification } = await import("@/lib/notifications");
+
+            if (action === "approve") {
+                await createNotification({
+                    userId: updatedListing.user.id,
+                    type: "LISTING_APPROVED",
+                    title: "İlanınız Onaylandı!",
+                    message: `${updatedListing.title} ilanınız yayına alındı`,
+                    link: `/listings/${id}`
+                });
+            } else if (action === "reject") {
+                await createNotification({
+                    userId: updatedListing.user.id,
+                    type: "LISTING_REJECTED",
+                    title: "İlanınız Reddedildi",
+                    message: `${updatedListing.title} ilanınız reddedildi`,
+                    link: `/listings/${id}/edit`
+                });
+            }
         }
 
         return NextResponse.json(updatedListing);

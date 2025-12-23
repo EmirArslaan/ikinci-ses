@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
+import { createMeetupSchema } from "@/lib/validations/meetup.validation";
+import { createValidationErrorResponse, ValidationError } from "@/lib/validations/validation-helpers";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -50,18 +52,25 @@ export async function POST(request: Request) {
         const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
 
         const body = await request.json();
-        const { title, description, date, location, type, images, videoUrl, price } = body;
+
+        // Validate with Zod
+        const validation = createMeetupSchema.safeParse(body);
+        if (!validation.success) {
+            return createValidationErrorResponse(new ValidationError(validation.error.issues));
+        }
+
+        const { title, description, date, location, type, images, videoUrl, price } = validation.data;
 
         const meetup = await prisma.meetup.create({
             data: {
                 title,
                 description,
-                date: new Date(date),
+                date,
                 location,
                 type,
                 images: images || [],
                 videoUrl,
-                price: price ? parseFloat(price) : null,
+                price: price || null,
                 userId: decoded.userId,
             },
         });
@@ -69,6 +78,12 @@ export async function POST(request: Request) {
         return NextResponse.json(meetup);
     } catch (error) {
         console.error("Create meetup error:", error);
+
+        // Handle validation errors
+        if (error instanceof ValidationError) {
+            return createValidationErrorResponse(error);
+        }
+
         return NextResponse.json(
             { error: "Error creating meetup" },
             { status: 500 }

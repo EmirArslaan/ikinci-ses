@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserFromRequest } from "@/lib/auth";
@@ -7,31 +6,53 @@ export async function GET(request: NextRequest) {
     try {
         const payload = getUserFromRequest(request);
         if (!payload) {
-            // Return 0 silently if not auth, or 401. Badge usually just handles 0.
-            return NextResponse.json({ count: 0 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // Logic: Count messages where (conversation has user) AND (sender != user) AND (isRead == false)
-        // Getting conversations first
-        const userConversations = await prisma.conversation.findMany({
-            where: { participants: { has: payload.userId } },
-            select: { id: true }
+        const { searchParams } = new URL(request.url);
+        const unreadOnly = searchParams.get("unreadOnly") === "true";
+        const limit = parseInt(searchParams.get("limit") || "20");
+        const page = parseInt(searchParams.get("page") || "1");
+
+        const where: any = {
+            userId: payload.userId,
+        };
+
+        if (unreadOnly) {
+            where.isRead = false;
+        }
+
+        const [notifications, unreadCount, total] = await Promise.all([
+            prisma.notification.findMany({
+                where,
+                orderBy: { createdAt: "desc" },
+                skip: (page - 1) * limit,
+                take: limit,
+            }),
+            prisma.notification.count({
+                where: {
+                    userId: payload.userId,
+                    isRead: false,
+                },
+            }),
+            prisma.notification.count({ where }),
+        ]);
+
+        return NextResponse.json({
+            notifications,
+            unreadCount,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
         });
-
-        const conversationIds = userConversations.map(c => c.id);
-
-        const count = await prisma.message.count({
-            where: {
-                conversationId: { in: conversationIds },
-                senderId: { not: payload.userId },
-                isRead: false
-            }
-        });
-
-        return NextResponse.json({ count });
-
     } catch (error) {
-        console.error("Notification count error:", error);
-        return NextResponse.json({ count: 0 });
+        console.error("Get notifications error:", error);
+        return NextResponse.json(
+            { error: "Failed to fetch notifications" },
+            { status: 500 }
+        );
     }
 }

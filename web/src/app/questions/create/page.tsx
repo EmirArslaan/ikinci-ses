@@ -296,58 +296,68 @@ export default function CreateQuestionPage() {
                     </div>
                 </div>
 
-                {/* Promotions */}
-                <div className="bg-white rounded-2xl shadow-sm p-6 mt-6">
-                    <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-purple-500">campaign</span>
-                        Sorunuzu Öne Çıkarın
-                    </h2>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {Object.entries(QA_PROMOTION_PACKAGES).map(([key, pkg]) => {
-                            const type = key as 'featured' | 'priority';
-                            const colorClasses = {
-                                amber: { bg: 'bg-amber-500', border: 'border-amber-400', light: 'bg-amber-100' },
-                                blue: { bg: 'bg-blue-500', border: 'border-blue-400', light: 'bg-blue-100' }
-                            }[pkg.color] || { bg: 'bg-gray-500', border: 'border-gray-400', light: 'bg-gray-100' };
-
-                            return (
-                                <div key={key} className={`rounded-xl border-2 p-4 ${selectedPromotions[type] ? colorClasses.border : 'border-gray-200'}`}>
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className={`w-10 h-10 rounded-full ${colorClasses.bg} flex items-center justify-center text-white`}>
-                                            <span className="material-symbols-outlined">{pkg.icon}</span>
-                                        </div>
-                                        <div>
-                                            <h3 className="font-bold text-gray-900">{pkg.name}</h3>
-                                            <p className="text-xs text-gray-500">{pkg.description}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {pkg.options.map((opt) => (
-                                            <button
-                                                key={opt.weeks}
-                                                type="button"
-                                                onClick={() => togglePromotion(type, opt.weeks)}
-                                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${selectedPromotions[type] === opt.weeks
-                                                    ? `${colorClasses.bg} text-white`
-                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                    }`}
-                                            >
-                                                {opt.label} - {formatQAPrice(opt.price)}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
+                {/* Promotions - COMING SOON */}
+                <div className="bg-white rounded-2xl shadow-sm p-6 mt-6 relative overflow-hidden">
+                    {/* Coming Soon Overlay */}
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-10 pointer-events-none">
+                        <div className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white font-black text-3xl px-12 py-6 rounded-2xl shadow-2xl transform rotate-[-5deg] border-4 border-white animate-pulse">
+                            YAKINDA!
+                        </div>
                     </div>
 
-                    {hasPromotions() && (
-                        <div className="mt-4 p-4 bg-purple-50 rounded-xl flex items-center justify-between">
-                            <span className="font-medium text-purple-900">Toplam Promosyon Tutarı:</span>
-                            <span className="text-xl font-bold text-purple-600">{formatQAPrice(getTotalPromotionCost())}</span>
+                    {/* Blurred content */}
+                    <div className="opacity-50 select-none">
+                        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-purple-500">campaign</span>
+                            Sorunuzu Öne Çıkarın
+                        </h2>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {Object.entries(QA_PROMOTION_PACKAGES).map(([key, pkg]) => {
+                                const type = key as 'featured' | 'priority';
+                                const colorClasses = {
+                                    amber: { bg: 'bg-amber-500', border: 'border-amber-400', light: 'bg-amber-100' },
+                                    blue: { bg: 'bg-blue-500', border: 'border-blue-400', light: 'bg-blue-100' }
+                                }[pkg.color] || { bg: 'bg-gray-500', border: 'border-gray-400', light: 'bg-gray-100' };
+
+                                return (
+                                    <div key={key} className={`rounded-xl border-2 p-4 ${selectedPromotions[type] ? colorClasses.border : 'border-gray-200'}`}>
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <div className={`w-10 h-10 rounded-full ${colorClasses.bg} flex items-center justify-center text-white`}>
+                                                <span className="material-symbols-outlined">{pkg.icon}</span>
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-gray-900">{pkg.name}</h3>
+                                                <p className="text-xs text-gray-500">{pkg.description}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {pkg.options.map((opt) => (
+                                                <button
+                                                    key={opt.weeks}
+                                                    type="button"
+                                                    disabled
+                                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${selectedPromotions[type] === opt.weeks
+                                                        ? `${colorClasses.bg} text-white`
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                        }`}
+                                                >
+                                                    {opt.label} - {formatQAPrice(opt.price)}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    )}
+
+                        {hasPromotions() && (
+                            <div className="mt-4 p-4 bg-purple-50 rounded-xl flex items-center justify-between">
+                                <span className="font-medium text-purple-900">Toplam Promosyon Tutarı:</span>
+                                <span className="text-xl font-bold text-purple-600">{formatQAPrice(getTotalPromotionCost())}</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Submit Buttons */}

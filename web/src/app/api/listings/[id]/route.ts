@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserFromRequest } from "@/lib/auth";
+import { updateListingSchema } from "@/lib/validations/listing.validation";
+import { createValidationErrorResponse, ValidationError } from "@/lib/validations/validation-helpers";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -145,6 +147,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         }
 
         const body = await request.json();
+
+        // Validate with Zod
+        const validation = updateListingSchema.safeParse(body);
+        if (!validation.success) {
+            return createValidationErrorResponse(new ValidationError(validation.error.issues));
+        }
+
         const {
             title,
             description,
@@ -156,14 +165,14 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
             categoryId,
             brandId,
             isActive,
-        } = body;
+        } = validation.data;
 
         const updatedListing = await prisma.listing.update({
             where: { id },
             data: {
                 ...(title && { title }),
                 ...(description && { description }),
-                ...(price && { price: parseFloat(price) }),
+                ...(price && { price }),
                 ...(condition && { condition }),
                 ...(images && { images }),
                 ...(phone && { phone }),
@@ -205,6 +214,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json(updatedListing);
     } catch (error) {
         console.error("Update listing error:", error);
+
+        // Handle validation errors
+        if (error instanceof ValidationError) {
+            return createValidationErrorResponse(error);
+        }
+
         return NextResponse.json(
             { error: "İlan güncellenirken bir hata oluştu" },
             { status: 500 }

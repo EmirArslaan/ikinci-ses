@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import NotificationBadge from "./NotificationBadge";
+import SearchBar from "./SearchBar";
 
 export default function ListingsHeader() {
     const { user, token, isAuthenticated, isLoading } = useAuth();
@@ -51,23 +52,7 @@ export default function ListingsHeader() {
 
                 {/* Search Bar */}
                 <div className="hidden md:flex flex-1 max-w-[480px]">
-                    <form action="/listings" method="GET" className="flex w-full h-12">
-                        <div className="flex w-full flex-1 items-stretch rounded-full h-full border border-gray-200 bg-white focus-within:border-[#8B4513] transition-colors">
-                            <div className="text-gray-400 flex items-center justify-center pl-4 pr-2">
-                                <span className="material-symbols-outlined">search</span>
-                            </div>
-                            <input
-                                name="search"
-                                className="flex w-full min-w-0 flex-1 bg-transparent text-gray-900 focus:outline-0 border-none placeholder:text-gray-400 px-0 text-base font-normal leading-normal"
-                                placeholder="Ne arıyorsun? (Gitar, Piyano...)"
-                            />
-                            <div className="pr-2 flex items-center">
-                                <button type="submit" className="bg-[#8B4513]/10 hover:bg-[#8B4513]/20 text-[#8B4513] p-2 rounded-full transition-colors">
-                                    <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
-                                </button>
-                            </div>
-                        </div>
-                    </form>
+                    <SearchBar />
                 </div>
 
                 {/* Navigation */}

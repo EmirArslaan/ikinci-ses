@@ -45,6 +45,24 @@ model User {
   questions       Question[]
   answers         Answer[]
   meetups         Meetup[]
+  
+  // Notifications
+  notifications   Notification[]
+  
+  // Reviews
+  reviewsGiven    Review[] @relation("ReviewsGiven")
+  reviewsReceived Review[] @relation("ReviewsReceived")
+  
+  // Rating statistics
+  averageRating   Float?   @default(0)
+  totalReviews    Int      @default(0)
+  
+  // Trust badges
+  isVerified      Boolean  @default(false)
+  isTrustedSeller Boolean  @default(false)
+  
+  // Payments
+  payments        Payment[]
 }
 
 model Category {
@@ -100,6 +118,9 @@ model Listing {
   
   // Phone visibility
   showPhone      Boolean   @default(true)
+  
+  // Payments
+  payments       Payment[]
 }
 
 model Favorite {
@@ -226,4 +247,92 @@ model Meetup {
   isActive    Boolean    @default(true)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+}
+
+enum NotificationType {
+  MESSAGE              // New message received
+  FAVORITE_UPDATE      // Favorited listing was updated
+  LISTING_APPROVED     // Your listing was approved
+  LISTING_REJECTED     // Your listing was rejected
+  QUESTION_APPROVED    // Your question was approved
+  QUESTION_REJECTED    // Your question was rejected
+  MEETUP_APPROVED      // Your meetup was approved
+  MEETUP_REJECTED      // Your meetup was rejected
+}
+
+model Notification {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String           @db.ObjectId
+  user      User             @relation(fields: [userId], references: [id])
+  
+  type      NotificationType
+  title     String
+  message   String
+  link      String?          // URL to navigate when clicked
+  
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+}
+
+model Review {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  rating      Int      // 1-5 stars
+  comment     String?
+  
+  reviewerId  String   @db.ObjectId
+  reviewer    User     @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  
+  reviewedId  String   @db.ObjectId
+  reviewed    User     @relation("ReviewsReceived", fields: [reviewedId], references: [id])
+  
+  listingId   String?  @db.ObjectId  // Optional: which transaction/listing
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([reviewerId, reviewedId, listingId])
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String        @db.ObjectId
+  user            User          @relation(fields: [userId], references: [id])
+  
+  amount          Float
+  currency        String        @default("TRY")
+  status          PaymentStatus @default(PENDING)
+  
+  listingId       String?       @db.ObjectId
+  listing         Listing?      @relation(fields: [listingId], references: [id])
+  
+  description     String?
+  
+  // Promotion details
+  promotionType   String?       // FEATURED, PRIORITY, URGENT
+  promotionWeeks  Int?
+  
+  // Provider details
+  provider        String        // paytr, stripe, iyzico
+  transactionId   String?       // Provider transaction ID
+  paymentToken    String?       // Payment token from provider
+  merchantOid     String?       // Our order ID
+  
+  // Metadata
+  ipAddress       String?
+  userAgent       String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([transactionId])
+  @@index([merchantOid])
 }

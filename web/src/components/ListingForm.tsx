@@ -575,74 +575,84 @@ export default function ListingForm({ initialData, mode, ticketId }: ListingForm
                     )}
                 </section>
 
-                {/* Section: Promotions (only for create mode) */}
+                {/* Section: Promotions (only for create mode) - COMING SOON */}
                 {mode === "create" && (
-                    <section className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-6 md:p-8 flex flex-col gap-6 shadow-sm">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-amber-600">stars</span>
-                                İlanınızı Öne Çıkarın
-                            </h3>
-                            <span className="text-xs text-amber-700 bg-amber-100 px-3 py-1 rounded-full font-medium">Opsiyonel</span>
-                        </div>
-
-                        <p className="text-gray-600 text-sm">
-                            Promosyon paketleri ile ilanınızı daha fazla kişiye ulaştırın ve daha hızlı satış yapın.
-                        </p>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {Object.entries(PROMOTION_PACKAGES).map(([key, pkg]) => {
-                                const type = key as PromotionType;
-                                const isSelected = selectedPromotions[type] !== null;
-                                const colorClasses = {
-                                    amber: { bg: 'bg-amber-500', border: 'border-amber-400', light: 'bg-amber-100' },
-                                    blue: { bg: 'bg-blue-500', border: 'border-blue-400', light: 'bg-blue-100' },
-                                    red: { bg: 'bg-red-500', border: 'border-red-400', light: 'bg-red-100' }
-                                }[pkg.color] || { bg: 'bg-gray-500', border: 'border-gray-400', light: 'bg-gray-100' };
-
-                                return (
-                                    <div
-                                        key={key}
-                                        className={`rounded-xl p-4 border-2 transition-all ${isSelected ? `${colorClasses.border} ${colorClasses.light}` : 'border-gray-200 bg-white hover:border-gray-300'}`}
-                                    >
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <div className={`size-10 rounded-full ${colorClasses.bg} flex items-center justify-center`}>
-                                                <span className="material-symbols-outlined text-white text-xl">{pkg.icon}</span>
-                                            </div>
-                                            <div>
-                                                <h4 className="font-bold text-gray-900">{pkg.name}</h4>
-                                                <p className="text-xs text-gray-500">{pkg.description}</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-wrap gap-2">
-                                            {pkg.options.map(option => (
-                                                <button
-                                                    key={option.weeks}
-                                                    type="button"
-                                                    onClick={() => togglePromotion(type, option.weeks)}
-                                                    className={`flex-1 min-w-[80px] px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedPromotions[type] === option.weeks
-                                                        ? `${colorClasses.bg} text-white`
-                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                        }`}
-                                                >
-                                                    <div>{option.label}</div>
-                                                    <div className="text-xs opacity-80">{formatPromotionPrice(option.price)}</div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* Total Cost */}
-                        {hasPromotions() && (
-                            <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-amber-200">
-                                <span className="font-medium text-gray-900">Toplam Promosyon Tutarı:</span>
-                                <span className="text-2xl font-black text-amber-600">{formatPromotionPrice(getTotalPromotionCost())}</span>
+                    <section className="relative bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-6 md:p-8 flex flex-col gap-6 shadow-sm overflow-hidden">
+                        {/* Coming Soon Overlay */}
+                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-10 pointer-events-none">
+                            <div className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white font-black text-3xl px-12 py-6 rounded-2xl shadow-2xl transform rotate-[-5deg] border-4 border-white animate-pulse">
+                                YAKINDA!
                             </div>
-                        )}
+                        </div>
+
+                        {/* Blurred content */}
+                        <div className="opacity-50 select-none">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-amber-600">stars</span>
+                                    İlanınızı Öne Çıkarın
+                                </h3>
+                                <span className="text-xs text-amber-700 bg-amber-100 px-3 py-1 rounded-full font-medium">Opsiyonel</span>
+                            </div>
+
+                            <p className="text-gray-600 text-sm">
+                                Promosyon paketleri ile ilanınızı daha fazla kişiye ulaştırın ve daha hızlı satış yapın.
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {Object.entries(PROMOTION_PACKAGES).map(([key, pkg]) => {
+                                    const type = key as PromotionType;
+                                    const isSelected = selectedPromotions[type] !== null;
+                                    const colorClasses = {
+                                        amber: { bg: 'bg-amber-500', border: 'border-amber-400', light: 'bg-amber-100' },
+                                        blue: { bg: 'bg-blue-500', border: 'border-blue-400', light: 'bg-blue-100' },
+                                        red: { bg: 'bg-red-500', border: 'border-red-400', light: 'bg-red-100' }
+                                    }[pkg.color] || { bg: 'bg-gray-500', border: 'border-gray-400', light: 'bg-gray-100' };
+
+                                    return (
+                                        <div
+                                            key={key}
+                                            className={`rounded-xl p-4 border-2 transition-all ${isSelected ? `${colorClasses.border} ${colorClasses.light}` : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                                        >
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className={`size-10 rounded-full ${colorClasses.bg} flex items-center justify-center`}>
+                                                    <span className="material-symbols-outlined text-white text-xl">{pkg.icon}</span>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-gray-900">{pkg.name}</h4>
+                                                    <p className="text-xs text-gray-500">{pkg.description}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-wrap gap-2">
+                                                {pkg.options.map(option => (
+                                                    <button
+                                                        key={option.weeks}
+                                                        type="button"
+                                                        disabled
+                                                        className={`flex-1 min-w-[80px] px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedPromotions[type] === option.weeks
+                                                            ? `${colorClasses.bg} text-white`
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                            }`}
+                                                    >
+                                                        <div>{option.label}</div>
+                                                        <div className="text-xs opacity-80">{formatPromotionPrice(option.price)}</div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Total Cost */}
+                            {hasPromotions() && (
+                                <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-amber-200">
+                                    <span className="font-medium text-gray-900">Toplam Promosyon Tutarı:</span>
+                                    <span className="text-2xl font-black text-amber-600">{formatPromotionPrice(getTotalPromotionCost())}</span>
+                                </div>
+                            )}
+                        </div>
                     </section>
                 )}
 

@@ -7,6 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "default-secret";
 export interface JWTPayload {
     userId: string;
     email: string;
+    name?: string;
     role?: string;
 }
 

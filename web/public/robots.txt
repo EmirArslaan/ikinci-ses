@@ -1,0 +1,20 @@
+# https://www.robotstxt.org/robotstxt.html
+
+User-agent: *
+Allow: /
+
+# Disallow admin and API routes
+Disallow: /admin
+Disallow: /api/
+Disallow: /auth/
+
+# Allow public API routes that might be useful
+Allow: /api/listings
+Allow: /api/categories
+Allow: /api/brands
+
+# Sitemap
+Sitemap: https://ikincises.com/sitemap.xml
+
+# Crawl delay (optional, be nice to the server)
+Crawl-delay: 1

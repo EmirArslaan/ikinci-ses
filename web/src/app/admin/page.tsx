@@ -4,6 +4,17 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 
+// Separate component to avoid hydration mismatch
+function CurrentDate() {
+    const [date, setDate] = useState('');
+
+    useEffect(() => {
+        setDate(new Date().toLocaleDateString('tr-TR'));
+    }, []);
+
+    return <span className="text-sm text-gray-500">{date}</span>;
+}
+
 export default function AdminDashboard() {
     const { token } = useAuth();
     const [stats, setStats] = useState({
@@ -99,7 +110,7 @@ export default function AdminDashboard() {
         <div className="space-y-8">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-gray-900">Genel Bakış</h1>
-                <span className="text-sm text-gray-500">{new Date().toLocaleDateString('tr-TR')}</span>
+                <CurrentDate />
             </div>
 
             {/* Listings Stats */}
