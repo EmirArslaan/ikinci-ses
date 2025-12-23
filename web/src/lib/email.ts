@@ -15,13 +15,25 @@ function getTransporter() {
 
     // Check if Gmail credentials are configured
     if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-        console.warn('⚠️  Gmail SMTP not configured. Running in DEMO mode.');
-        console.warn('   To enable real emails:');
-        console.warn('   1. Create a Gmail account');
-        console.warn('   2. Enable 2-Step Verification');
-        console.warn('   3. Generate App Password: https://myaccount.google.com/apppasswords');
-        console.warn('   4. Add to .env: GMAIL_USER=your@gmail.com');
-        console.warn('   5. Add to .env: GMAIL_APP_PASSWORD=your-app-password\n');
+        const isProduction = process.env.NODE_ENV === 'production';
+
+        if (isProduction) {
+            console.error('❌ Gmail SMTP not configured in PRODUCTION!');
+            console.error('   Email functionality is DISABLED.');
+            console.error('   To enable emails, add to Vercel environment variables:');
+            console.error('   - GMAIL_USER=your@gmail.com');
+            console.error('   - GMAIL_APP_PASSWORD=your-app-password');
+            console.error('   See GMAIL_SETUP.md for instructions.\n');
+        } else {
+            console.warn('⚠️  Gmail SMTP not configured. Running in DEMO mode.');
+            console.warn('   To enable real emails:');
+            console.warn('   1. Create a Gmail account');
+            console.warn('   2. Enable 2-Step Verification');
+            console.warn('   3. Generate App Password: https://myaccount.google.com/apppasswords');
+            console.warn('   4. Add to .env: GMAIL_USER=your@gmail.com');
+            console.warn('   5. Add to .env: GMAIL_APP_PASSWORD=your-app-password\n');
+        }
+
         return null;
     }
 
@@ -44,8 +56,16 @@ export async function sendVerificationEmail(
 ): Promise<{ success: boolean; previewUrl?: string }> {
     const transport = getTransporter();
 
-    // Demo mode
+    // Demo mode - only allowed in development
     if (!transport) {
+        const isProduction = process.env.NODE_ENV === 'production';
+
+        if (isProduction) {
+            console.error(`❌ Cannot send verification email to ${email} - Email service not configured`);
+            return { success: false };
+        }
+
+        // Development demo mode
         console.log(`📧 Demo verification email to ${email}:`);
         console.log(`   ✉️  Subject: İkinci Ses - E-posta Doğrulama Kodu`);
         console.log(`   🔑 Code: ${code}`);

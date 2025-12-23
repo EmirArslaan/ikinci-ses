@@ -17,40 +17,46 @@ export async function POST(request: NextRequest) {
 
         const { email, password, name, phone } = validation.data;
 
-        if (!verificationCode) {
-            return NextResponse.json(
-                { error: "E-posta doğrulama kodu zorunludur" },
-                { status: 400 }
-            );
-        }
+        // Email verification is optional - allows registration even if email service is unavailable
+        let emailVerified = false;
 
-        // Verify email code
-        const verification = await prisma.emailVerification.findUnique({
-            where: { email }
-        });
+        if (verificationCode) {
+            // Verify email code if provided
+            const verification = await prisma.emailVerification.findUnique({
+                where: { email }
+            });
 
-        if (!verification) {
-            return NextResponse.json(
-                { error: "Önce e-posta adresinizi doğrulamalısınız" },
-                { status: 400 }
-            );
-        }
+            if (!verification) {
+                return NextResponse.json(
+                    { error: "Geçersiz doğrulama kodu" },
+                    { status: 400 }
+                );
+            }
 
-        if (new Date() > verification.expiresAt) {
+            if (new Date() > verification.expiresAt) {
+                await prisma.emailVerification.delete({
+                    where: { email }
+                });
+                return NextResponse.json(
+                    { error: "Doğrulama kodunun süresi doldu" },
+                    { status: 400 }
+                );
+            }
+
+            if (verification.code !== verificationCode) {
+                return NextResponse.json(
+                    { error: "Geçersiz doğrulama kodu" },
+                    { status: 400 }
+                );
+            }
+
+            // Email verified successfully
+            emailVerified = true;
+
+            // Delete verification record
             await prisma.emailVerification.delete({
                 where: { email }
             });
-            return NextResponse.json(
-                { error: "Doğrulama kodunun süresi doldu" },
-                { status: 400 }
-            );
-        }
-
-        if (verification.code !== verificationCode) {
-            return NextResponse.json(
-                { error: "Geçersiz doğrulama kodu" },
-                { status: 400 }
-            );
         }
 
         // Check if email already exists
@@ -68,20 +74,15 @@ export async function POST(request: NextRequest) {
         // Hash password
         const hashedPassword = await hashPassword(password);
 
-        // Create user with verified email
+        // Create user with email verification status
         const user = await prisma.user.create({
             data: {
                 email,
-                emailVerified: true,
+                emailVerified,
                 password: hashedPassword,
                 name,
                 phone: phone || null,
             },
-        });
-
-        // Delete verification record
-        await prisma.emailVerification.delete({
-            where: { email }
         });
 
         // Send welcome email (non-blocking)

@@ -50,6 +50,19 @@ export async function POST(request: NextRequest) {
         const result = await sendVerificationEmail(email, code);
 
         if (!result.success) {
+            // In production without email configured, provide helpful message
+            const isProduction = process.env.NODE_ENV === 'production';
+            if (isProduction) {
+                return NextResponse.json(
+                    {
+                        error: "E-posta servisi yapılandırılmamış",
+                        message: "E-posta doğrulama şu anda kullanılamıyor. Kayıt olmaya devam edebilirsiniz.",
+                        skipVerification: true
+                    },
+                    { status: 503 } // Service Unavailable
+                );
+            }
+
             return NextResponse.json(
                 { error: "E-posta gönderilemedi" },
                 { status: 500 }
