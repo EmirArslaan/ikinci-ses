@@ -43,7 +43,35 @@ export async function POST(request: NextRequest) {
                 );
             }
 
-            if (verification.code !== verificationCode) {
+            // Normalize codes for comparison (trim whitespace, convert to string)
+            const normalizedDbCode = String(verification.code).trim();
+            const normalizedInputCode = String(verificationCode).trim();
+
+            console.log('🔍 === VERIFICATION CODE VALIDATION ===');
+            console.log('   Email:', email);
+            console.log('   Raw DB record:', {
+                id: verification.id,
+                email: verification.email,
+                code: verification.code,
+                expiresAt: verification.expiresAt
+            });
+            console.log('   DB Code (raw):', verification.code);
+            console.log('   DB Code type:', typeof verification.code);
+            console.log('   DB Code (trimmed):', normalizedDbCode);
+            console.log('   DB Code length:', normalizedDbCode.length);
+            console.log('   DB Code char codes:', normalizedDbCode.split('').map(c => c.charCodeAt(0)));
+            console.log('');
+            console.log('   Input Code (raw):', verificationCode);
+            console.log('   Input Code type:', typeof verificationCode);
+            console.log('   Input Code (trimmed):', normalizedInputCode);
+            console.log('   Input Code length:', normalizedInputCode.length);
+            console.log('   Input Code char codes:', normalizedInputCode.split('').map(c => c.charCodeAt(0)));
+            console.log('');
+            console.log('   Match result:', normalizedDbCode === normalizedInputCode);
+            console.log('   Strict equal:', verification.code === verificationCode);
+            console.log('======================================\n');
+
+            if (normalizedDbCode !== normalizedInputCode) {
                 return NextResponse.json(
                     { error: "Geçersiz doğrulama kodu" },
                     { status: 400 }

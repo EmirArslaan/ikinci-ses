@@ -107,10 +107,18 @@ export default function RegisterPage() {
         setError("");
 
         try {
+            const payload = {
+                name,
+                email,
+                phone: phone || undefined,
+                password,
+                verificationCode: verificationCode || undefined
+            };
+
             const res = await fetch("/api/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, email, phone: phone || null, password, verificationCode })
+                body: JSON.stringify(payload)
             });
 
             const data = await res.json();
@@ -119,7 +127,12 @@ export default function RegisterPage() {
                 login(data.token, data.user);
                 router.push("/");
             } else {
-                setError(data.error || "Kayıt olurken hata oluştu");
+                if (data.details && Array.isArray(data.details)) {
+                    const detailMessages = data.details.map((d: any) => d.message).join(", ");
+                    setError(`Lütfen formu kontrol edin: ${detailMessages}`);
+                } else {
+                    setError(data.error || "Kayıt olurken hata oluştu");
+                }
             }
         } catch (err) {
             console.error("Register error:", err);

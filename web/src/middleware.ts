@@ -84,8 +84,9 @@ export default function middleware(request: NextRequest) {
     const allowedOrigins = [
         'http://localhost:3000',
         'http://localhost:3001',
-        process.env.NEXT_PUBLIC_APP_URL || '',
-    ].filter(Boolean);
+        process.env.NEXT_PUBLIC_APP_URL,
+        process.env.NEXT_PUBLIC_SOCKET_URL,
+    ].filter(Boolean) as string[];
 
     if (origin && allowedOrigins.includes(origin)) {
         response.headers.set('Access-Control-Allow-Origin', origin);

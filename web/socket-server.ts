@@ -14,7 +14,7 @@ const httpServer = createServer();
 // Create Socket.io server
 const io = new SocketIOServer(httpServer, {
     cors: {
-        origin: 'http://localhost:3000',
+        origin: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
         credentials: true,
     },
 });

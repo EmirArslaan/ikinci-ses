@@ -39,12 +39,25 @@ export async function POST(request: NextRequest) {
         const code = generateVerificationCode();
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
+        console.log('🔑 === VERIFICATION CODE DEBUG ===');
+        console.log('   Email:', email);
+        console.log('   Generated code:', code);
+        console.log('   Code type:', typeof code);
+        console.log('   Code length:', code.length);
+        console.log('   Expires at:', expiresAt);
+
         // Upsert verification record
-        await prisma.emailVerification.upsert({
+        const dbResult = await prisma.emailVerification.upsert({
             where: { email },
             update: { code, expiresAt },
             create: { email, code, expiresAt }
         });
+
+        console.log('   Stored in DB:', dbResult.code);
+        console.log('   DB code type:', typeof dbResult.code);
+        console.log('   DB code length:', dbResult.code.length);
+        console.log('   Codes match:', code === dbResult.code);
+        console.log('=================================\n');
 
         // Send email
         const result = await sendVerificationEmail(email, code);

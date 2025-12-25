@@ -10,7 +10,15 @@ export const registerSchema = z.object({
     .min(2, 'İsim en az 2 karakter olmalıdır')
     .max(100, 'İsim en fazla 100 karakter olabilir'),
   phone: z.string()
-    .regex(/^(\+90|0)?5\d{9}$/, 'Geçerli bir Türkiye telefon numarası giriniz')
+    .nullable()
+    .optional()
+    .refine((val) => !val || /^(\+90|0)?5\d{9}$/.test(val), {
+      message: 'Geçerli bir Türkiye telefon numarası giriniz'
+    }),
+  verificationCode: z.string()
+    .length(6, 'Doğrulama kodu 6 haneli olmalıdır')
+    .regex(/^\d+$/, 'Doğrulama kodu sadece rakamlardan oluşmalıdır')
+    .nullable()
     .optional(),
 });
 
@@ -61,9 +69,12 @@ export const updateProfileSchema = z.object({
     .max(100, 'İsim en fazla 100 karakter olabilir')
     .optional(),
   phone: z.string()
-    .regex(/^(\+90|0)?5\d{9}$/, 'Geçerli bir Türkiye telefon numarası giriniz')
-    .optional(),
-  avatar: z.string().url('Geçerli bir URL giriniz').optional(),
+    .nullable()
+    .optional()
+    .refine((val) => !val || /^(\+90|0)?5\d{9}$/.test(val), {
+      message: 'Geçerli bir Türkiye telefon numarası giriniz'
+    }),
+  avatar: z.string().url('Geçerli bir URL giriniz').nullable().optional(),
 });
 
 // Types
