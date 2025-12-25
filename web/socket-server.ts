@@ -6,7 +6,7 @@ import { prisma } from './src/lib/prisma';
 
 console.log('🔑 JWT_SECRET loaded:', process.env.JWT_SECRET ? 'Yes ✅' : 'No ❌');
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // Create HTTP server
 const httpServer = createServer();

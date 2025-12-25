@@ -8,6 +8,7 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:socket\" --names \"next,socket\" --prefix-colors \"cyan,magenta\"",
     "build": "next build",
     "start": "next start",
+    "start:socket": "tsx socket-server.ts",
     "lint": "eslint",
     "seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts"
   },
